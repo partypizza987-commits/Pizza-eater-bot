@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { loadJSON, saveJSON } = require('../../utils/data');
 
@@ -14,14 +14,19 @@ function checkAndUpdateLimit(userId) {
   const data = loadJSON('roast_limits.json');
   const today = getTodayKey();
 
-  if (!data[userId]) data[userId] = {};
-  if (!data[userId][today]) data[userId][today] = { count: 0, lastUsed: 0 };
+  if (!data[userId]) {
+    data[userId] = {};
+  }
+
+  if (!data[userId][today]) {
+    data[userId][today] = { count: 0, lastUsed: 0 };
+  }
 
   const entry = data[userId][today];
   const now = Date.now();
 
   if (entry.count >= DAILY_LIMIT) {
-    return { allowed: false, reason: `daily_limit`, remaining: 0 };
+    return { allowed: false, reason: 'daily_limit', remaining: 0 };
   }
 
   const timeSinceLast = now - entry.lastUsed;
@@ -33,47 +38,78 @@ function checkAndUpdateLimit(userId) {
   entry.count += 1;
   entry.lastUsed = now;
   data[userId][today] = entry;
+
   saveJSON('roast_limits.json', data);
 
   return { allowed: true, remaining: DAILY_LIMIT - entry.count };
 }
 
 async function generateRoast(targetName) {
+  if (!process.env.GEMINI_KEY_ROAST) {
+    throw new Error('Missing GEMINI_KEY_ROAST environment variable.');
+  }
+
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY_ROAST);
   const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-  const result = await model.generateContent(
-    `Roast the person named "${targetName}" in a funny, witty, and harmless way. Keep it light-hearted and humorous — not mean or offensive. 2-3 sentences max. Only output the roast, nothing else.`
-  );
+  const prompt = `
+Roast the person named "${targetName}" in a funny, playful, and harmless way.
+Rules:
+- Keep it light-hearted
+- Do NOT be hateful, sexual, violent, or overly insulting
+- Make it sound like a playful joke between friends
+- Keep it to 2 short sentences max
+- Output only the roast
+`;
+
+  const result = await model.generateContent(prompt);
   return result.response.text().trim();
 }
 
 module.exports = {
   name: 'roast',
-  description: 'Get an AI roast of a mentioned user (5 per day for regular users)',
+  description: 'Get a funny AI roast of a user',
   usage: '%roast @user',
   category: 'fun',
   adminOnly: false,
 
   slashData: new SlashCommandBuilder()
     .setName('roast')
-    .setDescription('Get an AI roast of a user (5 per day for regular users)')
-    .addUserOption(opt => opt.setName('user').setDescription('The user to roast').setRequired(true)),
+    .setDescription('Get a funny AI roast of a user')
+    .addUserOption(option =>
+      option
+        .setName('user')
+        .setDescription('The user to roast')
+        .setRequired(true)
+    ),
 
-  async execute(message, args) {
+  async execute(message) {
     const target = message.mentions.members.first();
-    if (!target) return message.reply('❌ Please mention someone to roast! Usage: `%roast @user`');
 
-    const isAdmin = message.member?.permissions.has('Administrator');
+    if (!target) {
+      return message.reply('❌ Please mention someone to roast! Usage: `%roast @user`');
+    }
+
+    if (target.user.id === message.author.id) {
+      return message.reply('😂 Bro you cannot roast yourself with this command.');
+    }
+
+    if (target.user.bot) {
+      return message.reply('🤖 Nice try bro, but I am not roasting bots.');
+    }
+
+    const isAdmin = message.member?.permissions.has(PermissionFlagsBits.Administrator);
 
     if (!isAdmin) {
       const check = checkAndUpdateLimit(message.author.id);
+
       if (!check.allowed) {
         if (check.reason === 'daily_limit') {
-          return message.reply(`❌ You've hit your **daily roast limit of ${DAILY_LIMIT}**! Come back tomorrow. 🔥`);
+          return message.reply(`❌ You reached your **daily roast limit of ${DAILY_LIMIT}**. Come back tomorrow 🔥`);
         }
+
         if (check.reason === 'cooldown') {
-          return message.reply(`⏳ Slow down! You can roast again in **${check.secondsLeft} second(s)**!`);
+          return message.reply(`⏳ Chill bro, you can roast again in **${check.secondsLeft} second(s)**.`);
         }
       }
     }
@@ -85,31 +121,66 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setColor(0xe74c3c)
-        .setTitle(`🔥 Roasting ${target.displayName}...`)
+        .setTitle(`🔥 Roasting ${target.displayName}`)
         .setDescription(roast)
-        .setThumbnail(target.user.displayAvatarURL())
-        .setFooter({ text: isAdmin ? 'Admin — no limits 😈' : `Requested by ${message.author.tag}` })
+        .setThumbnail(target.user.displayAvatarURL({ dynamic: true }))
+        .addFields(
+          { name: 'Target', value: `${target}`, inline: true },
+          { name: 'Requested By', value: `${message.author}`, inline: true },
+          { name: 'Limits', value: isAdmin ? 'Admin: Unlimited' : `Daily max: ${DAILY_LIMIT}`, inline: true }
+        )
+        .setFooter({ text: isAdmin ? 'Admin mode 😈' : 'Fun roast mode 😈' })
         .setTimestamp();
 
-      message.reply({ embeds: [embed] });
+      return message.reply({ embeds: [embed] });
     } catch (err) {
       console.error('Roast error:', err);
-      message.reply('❌ Couldn\'t generate a roast right now. Try again!');
+      return message.reply('❌ Couldn’t generate a roast right now. Check Gemini key or try again later.');
     }
   },
 
   async executeSlash(interaction) {
     const target = interaction.options.getMember('user');
-    const isAdmin = interaction.member?.permissions.has('Administrator');
+
+    if (!target) {
+      return interaction.reply({
+        content: '❌ I could not find that user in this server.',
+        ephemeral: true
+      });
+    }
+
+    if (target.user.id === interaction.user.id) {
+      return interaction.reply({
+        content: '😂 Bro you cannot roast yourself with this command.',
+        ephemeral: true
+      });
+    }
+
+    if (target.user.bot) {
+      return interaction.reply({
+        content: '🤖 Nice try bro, but I am not roasting bots.',
+        ephemeral: true
+      });
+    }
+
+    const isAdmin = interaction.member?.permissions.has(PermissionFlagsBits.Administrator);
 
     if (!isAdmin) {
       const check = checkAndUpdateLimit(interaction.user.id);
+
       if (!check.allowed) {
         if (check.reason === 'daily_limit') {
-          return interaction.reply({ content: `❌ You've hit your **daily roast limit of ${DAILY_LIMIT}**! Come back tomorrow. 🔥`, ephemeral: true });
+          return interaction.reply({
+            content: `❌ You reached your **daily roast limit of ${DAILY_LIMIT}**. Come back tomorrow 🔥`,
+            ephemeral: true
+          });
         }
+
         if (check.reason === 'cooldown') {
-          return interaction.reply({ content: `⏳ Slow down! You can roast again in **${check.secondsLeft} second(s)**!`, ephemeral: true });
+          return interaction.reply({
+            content: `⏳ Chill bro, you can roast again in **${check.secondsLeft} second(s)**.`,
+            ephemeral: true
+          });
         }
       }
     }
@@ -121,16 +192,21 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setColor(0xe74c3c)
-        .setTitle(`🔥 Roasting ${target.displayName}...`)
+        .setTitle(`🔥 Roasting ${target.displayName}`)
         .setDescription(roast)
-        .setThumbnail(target.user.displayAvatarURL())
-        .setFooter({ text: isAdmin ? 'Admin — no limits 😈' : `Requested by ${interaction.user.tag}` })
+        .setThumbnail(target.user.displayAvatarURL({ dynamic: true }))
+        .addFields(
+          { name: 'Target', value: `${target}`, inline: true },
+          { name: 'Requested By', value: `${interaction.user}`, inline: true },
+          { name: 'Limits', value: isAdmin ? 'Admin: Unlimited' : `Daily max: ${DAILY_LIMIT}`, inline: true }
+        )
+        .setFooter({ text: isAdmin ? 'Admin mode 😈' : 'Fun roast mode 😈' })
         .setTimestamp();
 
-      interaction.editReply({ embeds: [embed] });
+      return interaction.editReply({ embeds: [embed] });
     } catch (err) {
       console.error('Roast error:', err);
-      interaction.editReply('❌ Couldn\'t generate a roast right now. Try again!');
+      return interaction.editReply('❌ Couldn’t generate a roast right now. Check Gemini key or try again later.');
     }
   }
 };
