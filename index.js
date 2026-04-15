@@ -100,18 +100,24 @@ client.once(Events.ClientReady, async (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
   console.log(`✅ Loaded commands: ${[...client.commands.keys()].join(', ')}`);
 
+  const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
+
   try {
-    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
+    // Clear ALL old global slash commands so duplicates disappear
+    await rest.put(
+      Routes.applicationCommands(c.user.id),
+      { body: [] }
+    );
+    console.log('🧹 Cleared all global slash commands');
 
     if (!process.env.GUILD_ID) {
-      console.log('⚠️ GUILD_ID is missing. Slash commands will not be registered.');
+      console.log('⚠️ GUILD_ID is missing. Guild slash commands were not registered.');
     } else {
       await rest.put(
         Routes.applicationGuildCommands(c.user.id, process.env.GUILD_ID),
         { body: allSlashCommands }
       );
-
-      console.log(`✅ Registered ${allSlashCommands.length} guild slash commands instantly.`);
+      console.log(`✅ Registered ${allSlashCommands.length} guild slash commands`);
     }
   } catch (err) {
     console.error('❌ Failed to register slash commands:', err);
