@@ -30,10 +30,7 @@ for (const folder of commandFolders) {
     client.commands.set(command.name, command);
 
     if (command.slashData) {
-      allSlashCommands.push({
-        name: command.name,
-        data: command.slashData.toJSON()
-      });
+      allSlashCommands.push(command.slashData.toJSON());
     }
   }
 }
@@ -41,19 +38,13 @@ for (const folder of commandFolders) {
 const helpCommand = require('./commands/help');
 client.commands.set(helpCommand.name, helpCommand);
 if (helpCommand.slashData) {
-  allSlashCommands.push({
-    name: helpCommand.name,
-    data: helpCommand.slashData.toJSON()
-  });
+  allSlashCommands.push(helpCommand.slashData.toJSON());
 }
 
 const setroleCommand = require('./commands/setrole');
 client.commands.set(setroleCommand.name, setroleCommand);
 if (setroleCommand.slashData) {
-  allSlashCommands.push({
-    name: setroleCommand.name,
-    data: setroleCommand.slashData.toJSON()
-  });
+  allSlashCommands.push(setroleCommand.slashData.toJSON());
 }
 
 function normalizeGuildConfig(rawData, guildId) {
@@ -109,20 +100,21 @@ client.once(Events.ClientReady, async (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
   console.log(`✅ Loaded commands: ${[...client.commands.keys()].join(', ')}`);
 
-  const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
+  try {
+    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
 
-  for (const cmd of allSlashCommands) {
-    try {
-      console.log(`⏳ Registering slash command: ${cmd.name}`);
-      await rest.post(
-        Routes.applicationCommands(c.user.id),
-        { body: cmd.data }
+    if (!process.env.GUILD_ID) {
+      console.log('⚠️ GUILD_ID is missing. Slash commands will not be registered.');
+    } else {
+      await rest.put(
+        Routes.applicationGuildCommands(c.user.id, process.env.GUILD_ID),
+        { body: allSlashCommands }
       );
-      console.log(`✅ Registered slash command: ${cmd.name}`);
-    } catch (err) {
-      console.error(`❌ Failed to register slash command: ${cmd.name}`);
-      console.error(JSON.stringify(err.rawError || err, null, 2));
+
+      console.log(`✅ Registered ${allSlashCommands.length} guild slash commands instantly.`);
     }
+  } catch (err) {
+    console.error('❌ Failed to register slash commands:', err);
   }
 });
 
@@ -159,7 +151,9 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 client.on(Events.MessageCreate, async message => {
-  if (message.author.bot || !message.content.startsWith(PREFIX)) return;
+  if (message.author.bot) return;
+  if (!message.guild) return;
+  if (!message.content.startsWith(PREFIX)) return;
 
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
   const commandName = args.shift()?.toLowerCase();
@@ -175,7 +169,7 @@ client.on(Events.MessageCreate, async message => {
     await command.execute(message, args, client);
   } catch (error) {
     console.error(error);
-    await message.reply('There was an error while executing that command.');
+    await message.reply('❌ There was an error while executing that command.');
   }
 });
 
