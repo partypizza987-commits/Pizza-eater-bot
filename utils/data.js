@@ -7,6 +7,7 @@ if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 function loadJSON(filename) {
   const filePath = path.join(dataDir, filename);
   if (!fs.existsSync(filePath)) return {};
+
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'));
   } catch {
