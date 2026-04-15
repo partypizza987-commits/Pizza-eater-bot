@@ -50,16 +50,12 @@ async function generateRoast(targetName) {
   }
 
   const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY_ROAST);
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
   const prompt = `
-Roast the person named "${targetName}" in a funny, playful, and harmless way.
-Rules:
-- Keep it light-hearted
-- Do NOT be hateful, sexual, violent, or overly insulting
-- Make it sound like a playful joke between friends
-- Keep it to 2 short sentences max
-- Output only the roast
+Roast the person named "${targetName}" in a funny, playful, harmless way.
+Keep it light, non-hateful, non-sexual, and 2 short sentences max.
+Only output the roast.
 `;
 
   const result = await model.generateContent(prompt);
@@ -135,7 +131,7 @@ module.exports = {
       return message.reply({ embeds: [embed] });
     } catch (err) {
       console.error('Roast error:', err);
-      return message.reply('❌ Couldn’t generate a roast right now. Check Gemini key or try again later.');
+      return message.reply('❌ Couldn’t generate a roast right now.');
     }
   },
 
@@ -206,7 +202,7 @@ module.exports = {
       return interaction.editReply({ embeds: [embed] });
     } catch (err) {
       console.error('Roast error:', err);
-      return interaction.editReply('❌ Couldn’t generate a roast right now. Check Gemini key or try again later.');
+      return interaction.editReply('❌ Couldn’t generate a roast right now.');
     }
   }
 };
