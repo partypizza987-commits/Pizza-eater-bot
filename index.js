@@ -50,12 +50,10 @@ if (setroleCommand.slashData) {
 function hasCommandAccess(member, command) {
   if (!member || !command) return false;
 
-  // Admins can always use everything
   if (member.permissions.has(PermissionFlagsBits.Administrator)) {
     return true;
   }
 
-  // Fun and general commands are open to everyone
   if (command.category === 'fun' || command.category === 'general') {
     return true;
   }
@@ -83,6 +81,7 @@ client.once(Events.ClientReady, async (c) => {
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
     await rest.put(Routes.applicationCommands(c.user.id), { body: allSlashCommands });
     console.log(`✅ Registered ${allSlashCommands.length} slash commands globally.`);
+    console.log('✅ Loaded commands:', [...client.commands.keys()].join(', '));
   } catch (err) {
     console.error('❌ Failed to register slash commands:', err);
   }
