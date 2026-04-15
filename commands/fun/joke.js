@@ -16,25 +16,30 @@ module.exports = {
     await message.channel.sendTyping();
 
     try {
+      if (!process.env.GEMINI_KEY_JOKE) {
+        return message.reply('❌ GEMINI_KEY_JOKE is missing in Railway variables.');
+      }
+
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY_JOKE);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
       const result = await model.generateContent(
-        'Tell me a single funny, clean, and original joke. Keep it short and punchy. Only output the joke itself, no extra commentary.'
+        'Tell me one clean, funny, original joke. Keep it short. Output only the joke.'
       );
+
       const text = result.response.text().trim();
 
       const embed = new EmbedBuilder()
         .setColor(0xf39c12)
         .setTitle('😂 Joke Time!')
         .setDescription(text)
-        .setFooter({ text: 'Powered by AI' })
+        .setFooter({ text: 'Powered by Gemini' })
         .setTimestamp();
 
-      message.reply({ embeds: [embed] });
+      return message.reply({ embeds: [embed] });
     } catch (err) {
       console.error('Joke error:', err);
-      message.reply('❌ Couldn\'t think of a joke right now. Try again!');
+      return message.reply('❌ Couldn’t generate a joke right now.');
     }
   },
 
@@ -42,25 +47,30 @@ module.exports = {
     await interaction.deferReply();
 
     try {
+      if (!process.env.GEMINI_KEY_JOKE) {
+        return interaction.editReply('❌ GEMINI_KEY_JOKE is missing in Railway variables.');
+      }
+
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY_JOKE);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
       const result = await model.generateContent(
-        'Tell me a single funny, clean, and original joke. Keep it short and punchy. Only output the joke itself, no extra commentary.'
+        'Tell me one clean, funny, original joke. Keep it short. Output only the joke.'
       );
+
       const text = result.response.text().trim();
 
       const embed = new EmbedBuilder()
         .setColor(0xf39c12)
         .setTitle('😂 Joke Time!')
         .setDescription(text)
-        .setFooter({ text: 'Powered by AI' })
+        .setFooter({ text: 'Powered by Gemini' })
         .setTimestamp();
 
-      interaction.editReply({ embeds: [embed] });
+      return interaction.editReply({ embeds: [embed] });
     } catch (err) {
       console.error('Joke error:', err);
-      interaction.editReply('❌ Couldn\'t think of a joke right now. Try again!');
+      return interaction.editReply('❌ Couldn’t generate a joke right now.');
     }
   }
 };
