@@ -56,6 +56,30 @@ if (setroleCommand.slashData) {
   });
 }
 
+function normalizeGuildConfig(rawData, guildId) {
+  if (!rawData[guildId]) {
+    rawData[guildId] = {};
+  }
+
+  if (!Array.isArray(rawData[guildId].staffRoleIds)) {
+    if (rawData[guildId].staffRoleId) {
+      rawData[guildId].staffRoleIds = [rawData[guildId].staffRoleId];
+    } else {
+      rawData[guildId].staffRoleIds = [];
+    }
+  }
+
+  if (!Array.isArray(rawData[guildId].modRoleIds)) {
+    if (rawData[guildId].modRoleId) {
+      rawData[guildId].modRoleIds = [rawData[guildId].modRoleId];
+    } else {
+      rawData[guildId].modRoleIds = [];
+    }
+  }
+
+  return rawData[guildId];
+}
+
 function hasCommandAccess(member, command) {
   if (!member || !command) return false;
 
@@ -68,16 +92,14 @@ function hasCommandAccess(member, command) {
   }
 
   const data = loadJSON('permissions.json');
-  const guildConfig = data[member.guild.id] || {};
+  const guildConfig = normalizeGuildConfig(data, member.guild.id);
 
   if (command.category === 'mod') {
-    if (!guildConfig.modRoleId) return false;
-    return member.roles.cache.has(guildConfig.modRoleId);
+    return guildConfig.modRoleIds.some(roleId => member.roles.cache.has(roleId));
   }
 
   if (command.category === 'staff') {
-    if (!guildConfig.staffRoleId) return false;
-    return member.roles.cache.has(guildConfig.staffRoleId);
+    return guildConfig.staffRoleIds.some(roleId => member.roles.cache.has(roleId));
   }
 
   return true;
