@@ -30,7 +30,10 @@ for (const folder of commandFolders) {
     client.commands.set(command.name, command);
 
     if (command.slashData) {
-      allSlashCommands.push(command.slashData.toJSON());
+      allSlashCommands.push({
+        name: command.name,
+        data: command.slashData.toJSON()
+      });
     }
   }
 }
@@ -38,13 +41,19 @@ for (const folder of commandFolders) {
 const helpCommand = require('./commands/help');
 client.commands.set(helpCommand.name, helpCommand);
 if (helpCommand.slashData) {
-  allSlashCommands.push(helpCommand.slashData.toJSON());
+  allSlashCommands.push({
+    name: helpCommand.name,
+    data: helpCommand.slashData.toJSON()
+  });
 }
 
 const setroleCommand = require('./commands/setrole');
 client.commands.set(setroleCommand.name, setroleCommand);
 if (setroleCommand.slashData) {
-  allSlashCommands.push(setroleCommand.slashData.toJSON());
+  allSlashCommands.push({
+    name: setroleCommand.name,
+    data: setroleCommand.slashData.toJSON()
+  });
 }
 
 function hasCommandAccess(member, command) {
@@ -76,14 +85,22 @@ function hasCommandAccess(member, command) {
 
 client.once(Events.ClientReady, async (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
+  console.log(`✅ Loaded commands: ${[...client.commands.keys()].join(', ')}`);
 
-  try {
-    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
-    await rest.put(Routes.applicationCommands(c.user.id), { body: allSlashCommands });
-    console.log(`✅ Registered ${allSlashCommands.length} slash commands globally.`);
-    console.log('✅ Loaded commands:', [...client.commands.keys()].join(', '));
-  } catch (err) {
-    console.error('❌ Failed to register slash commands:', err);
+  const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_BOT_TOKEN);
+
+  for (const cmd of allSlashCommands) {
+    try {
+      console.log(`⏳ Registering slash command: ${cmd.name}`);
+      await rest.post(
+        Routes.applicationCommands(c.user.id),
+        { body: cmd.data }
+      );
+      console.log(`✅ Registered slash command: ${cmd.name}`);
+    } catch (err) {
+      console.error(`❌ Failed to register slash command: ${cmd.name}`);
+      console.error(JSON.stringify(err.rawError || err, null, 2));
+    }
   }
 });
 
@@ -123,7 +140,7 @@ client.on(Events.MessageCreate, async message => {
   if (message.author.bot || !message.content.startsWith(PREFIX)) return;
 
   const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-  const commandName = args.shift().toLowerCase();
+  const commandName = args.shift()?.toLowerCase();
 
   const command = client.commands.get(commandName);
   if (!command) return;
