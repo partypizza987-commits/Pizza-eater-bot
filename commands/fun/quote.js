@@ -13,28 +13,33 @@ module.exports = {
     .setDescription('Get an AI-generated quote of the day'),
 
   async execute(message) {
-    const typing = await message.channel.sendTyping();
+    await message.channel.sendTyping();
 
     try {
+      if (!process.env.GEMINI_KEY_QUOTE) {
+        return message.reply('❌ GEMINI_KEY_QUOTE is missing in Railway variables.');
+      }
+
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY_QUOTE);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
       const result = await model.generateContent(
-        'Generate a single unique, inspiring, and thoughtful quote of the day. Make it feel genuine and memorable. Only output the quote and who said it (or "Unknown" if original). Format: "Quote here." — Author'
+        'Generate one short inspiring quote. Output only: "Quote" — Author'
       );
+
       const text = result.response.text().trim();
 
       const embed = new EmbedBuilder()
         .setColor(0x9b59b6)
         .setTitle('✨ Quote of the Day')
         .setDescription(`*${text}*`)
-        .setFooter({ text: 'Powered by AI' })
+        .setFooter({ text: 'Powered by Gemini' })
         .setTimestamp();
 
-      message.reply({ embeds: [embed] });
+      return message.reply({ embeds: [embed] });
     } catch (err) {
       console.error('Quote error:', err);
-      message.reply('❌ Couldn\'t fetch a quote right now. Try again later!');
+      return message.reply('❌ Couldn’t fetch a quote right now.');
     }
   },
 
@@ -42,25 +47,30 @@ module.exports = {
     await interaction.deferReply();
 
     try {
+      if (!process.env.GEMINI_KEY_QUOTE) {
+        return interaction.editReply('❌ GEMINI_KEY_QUOTE is missing in Railway variables.');
+      }
+
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY_QUOTE);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
       const result = await model.generateContent(
-        'Generate a single unique, inspiring, and thoughtful quote of the day. Make it feel genuine and memorable. Only output the quote and who said it (or "Unknown" if original). Format: "Quote here." — Author'
+        'Generate one short inspiring quote. Output only: "Quote" — Author'
       );
+
       const text = result.response.text().trim();
 
       const embed = new EmbedBuilder()
         .setColor(0x9b59b6)
         .setTitle('✨ Quote of the Day')
         .setDescription(`*${text}*`)
-        .setFooter({ text: 'Powered by AI' })
+        .setFooter({ text: 'Powered by Gemini' })
         .setTimestamp();
 
-      interaction.editReply({ embeds: [embed] });
+      return interaction.editReply({ embeds: [embed] });
     } catch (err) {
       console.error('Quote error:', err);
-      interaction.editReply('❌ Couldn\'t fetch a quote right now. Try again later!');
+      return interaction.editReply('❌ Couldn’t fetch a quote right now.');
     }
   }
 };
